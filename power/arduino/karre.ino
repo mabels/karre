@@ -4,25 +4,14 @@
 #include "Wire.h"
 #include "Adafruit_MCP9808.h"
 
-
-
-class PortBase {
-  protected:
-    int8_t port;
-  public:
-  void setup(int8_t _port, int8_t mode) {
-    port = _port;
-    pinMode(_port, mode);
-  }
-};
-
-class AnalogRead : public PortBase {
+template <int8_t port>
+class AnalogRead {
   private:
     int16_t state;
   public:
-    void setup(int8_t port) {
-      PortBase::setup(port, INPUT);
-      digitalWrite(port, HIGH); //pull on
+    void setup() {
+      pinMode(port, INPUT);
+      digitalWrite(port, HIGH); //pull up on
       state = 0;
     }
     int16_t read() {
@@ -34,12 +23,13 @@ class AnalogRead : public PortBase {
     }
 };
 
-class DigitalWrite : public PortBase {
+template <int8_t port>
+class DigitalWrite {
   private:
     int8_t state;
   public:
-    void setup(int8_t port) {
-      PortBase::setup(port, OUTPUT);
+    void setup() {
+      pinMode(port, OUTPUT);
       state = LOW;
     }
 
@@ -67,7 +57,7 @@ private:
     template <class T, void (T::*TMethod)(void)>
     static void method_stub(void* object_ptr) {
         T* p = static_cast<T*>(object_ptr);
-        return (p->*TMethod)(); // #2
+        return (p->*TMethod)();
     }
 };
 
@@ -77,14 +67,14 @@ class CarApp {
     const int8_t DONE=0;
     Timer t;
 
-    AnalogRead voltage_car;
-    AnalogRead voltage_220;
-    AnalogRead voltage_vbat;
+    AnalogRead<A1> voltage_car;
+    AnalogRead<A2> voltage_220;
+    AnalogRead<A3> voltage_vbat;
 
-    DigitalWrite relay_car_220_loader;
-    DigitalWrite relay_vbat;
-    DigitalWrite relay_car;
-    DigitalWrite relay_inverter_net;
+    DigitalWrite<1> relay_car_220_loader;
+    DigitalWrite<2> relay_inverter_net;
+    DigitalWrite<3> relay_vbat;
+    DigitalWrite<4> relay_car;
 
     int16_t times;
 
@@ -111,14 +101,14 @@ class CarApp {
     }
 
     int setup() {
-      voltage_car.setup(A1);
-      voltage_220.setup(A2);
-      voltage_vbat.setup(A3);
+      voltage_car.setup();
+      voltage_220.setup();
+      voltage_vbat.setup();
 
-      relay_inverter_net.setup(1);
-      relay_car_220_loader.setup(2);
-      relay_vbat.setup(3);
-      relay_car.setup(4);
+      relay_inverter_net.setup();
+      relay_car_220_loader.setup();
+      relay_vbat.setup();
+      relay_car.setup();
 
       tempsensor.begin();
       //Serial.println("jo-3");
