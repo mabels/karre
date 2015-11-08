@@ -137,7 +137,7 @@ class CarApp {
       Serial.print(F(",relay_vbat:"));Serial.print(relay_inverter_net.currentValue());
       Serial.print(F(",relay_car:"));Serial.print(relay_car.currentValue());
       Serial.print(F(",relay_inverter:"));Serial.print(relay_inverter_net.currentValue());
-      Serial.print(F("}\n"));
+      Serial.print(F("}\r\n"));
     }
 
     void checkPower() {
