@@ -11,15 +11,34 @@ class AnalogRead {
   public:
     void setup() {
       pinMode(port, INPUT);
-      digitalWrite(port, HIGH); //pull up on
+      //digitalWrite(port, HIGH); //pull up on
       state = 0;
     }
     int16_t read() {
       state = analogRead(port);
       return state;
     }
-    int16_t currentValue() {
+    int16_t value() const {
       return state;
+    }
+};
+
+template <int8_t port>
+class AnalogWrite {
+  private:
+    int16_t currentValue;
+  public:
+    void setup() {
+      pinMode(port, OUTPUT);
+      currentValue = 0;
+    }
+    int16_t write(int16_t v) {
+      currentValue = v;
+      analogWrite(port, currentValue);
+      return currentValue;
+    }
+    int16_t value() const {
+      return currentValue;
     }
 };
 
@@ -28,9 +47,16 @@ class DigitalWrite {
   private:
     int8_t state;
   public:
-    void setup() {
+    DigitalWrite& setup() {
       pinMode(port, OUTPUT);
-      state = LOW;
+      return *this;
+    }
+
+    void high() {
+      write(HIGH);
+    }
+    void low() {
+      write(LOW);
     }
 
     int8_t write(int8_t _state) {
@@ -38,14 +64,13 @@ class DigitalWrite {
       digitalWrite(port, state);
       return state;
     }
-    int8_t currentValue() {
+    int8_t value() const {
       return state;
     }
 };
 
 
-class Delegate
-{
+class Delegate {
 public:
     typedef void (*Ptr)(void *);
 
@@ -61,34 +86,52 @@ private:
     }
 };
 
+class TempSensor {
+  private:
+    Adafruit_MCP9808 tempsensor;
+    boolean ok;
+    float currentValue;
+  public:
+    boolean isOk() const {
+      return ok;
+    }
+    float value() const {
+      return currentValue;
+    }
+    TempSensor() : ok(false), currentValue(0) { }
+    float read() {
+      tempsensor.awake();
+      currentValue = tempsensor.readTempC();
+      tempsensor.shutdown();
+      return currentValue;
+    }
+    void begin() {
+      ok = tempsensor.begin();
+    }
+};
+
 class CarApp {
   private:
-    const int8_t NEXT=42;
-    const int8_t DONE=0;
+    const static int8_t NEXT=42;
+    const static int8_t DONE=0;
     Timer t;
 
     AnalogRead<A1> voltage_car;
     AnalogRead<A2> voltage_220;
     AnalogRead<A3> voltage_vbat;
 
-    DigitalWrite<1> relay_car_220_loader;
-    DigitalWrite<2> relay_inverter_net;
-    DigitalWrite<3> relay_vbat;
-    DigitalWrite<4> relay_car;
+    AnalogWrite<A4> fan_speed;
+
+    DigitalWrite<4> relay_car_220_loader;
+    DigitalWrite<5> relay_inverter_net;
+    DigitalWrite<6> relay_vbat;
+    DigitalWrite<7> relay_car;
 
     int16_t times;
 
-    Adafruit_MCP9808 tempsensor;
-    float temperatur;
-
     int8_t  two_times;
 
-    int16_t readMCP9808() {
-//      tempsensor.shutdown_wake(0);
-//      temperatur = tempsensor.readTempC();
-//      tempsensor.shutdown_wake(1);
-    }
-
+    TempSensor tempsensor;
     Delegate::Ptr delegateCheckPower;
     Delegate::Ptr delegateCheckTemperatur;
     Delegate::Ptr delegateSendState;
@@ -100,15 +143,17 @@ class CarApp {
       delegateSendState = Delegate::instance<CarApp, &CarApp::sendState>(this);
     }
 
-    int setup() {
+    void setup() {
       voltage_car.setup();
       voltage_220.setup();
       voltage_vbat.setup();
 
-      relay_inverter_net.setup();
-      relay_car_220_loader.setup();
-      relay_vbat.setup();
-      relay_car.setup();
+      fan_speed.setup();
+
+      relay_inverter_net.setup().high();
+      relay_car_220_loader.setup().high();
+      relay_vbat.setup().high();
+      relay_car.setup().high();
 
       tempsensor.begin();
       //Serial.println("jo-3");
@@ -117,26 +162,28 @@ class CarApp {
       //Serial.println("jo-4");
       sendState();
     }
-    int loop() {
+    void loop() {
       t.update();
     }
     void sendState() {
       two_times = 0;
 
       t.after(900, delegateCheckTemperatur, this);
-      t.after(200, delegateCheckPower, this);
+      //t.after(200, delegateCheckPower, this);
       Serial.print(F("{"));
       Serial.print(F("instance:"));Serial.print((long)this);
       Serial.print(F(",times:"));Serial.print(++times);
       Serial.print(F(",millis:"));Serial.print(millis());
-      Serial.print(F(",temperatur:"));Serial.print(temperatur);
-      Serial.print(F(",voltage_220:"));Serial.print(voltage_220.currentValue());
-      Serial.print(F(",voltage_car:"));Serial.print(voltage_car.currentValue());
-      Serial.print(F(",voltage_vbat:"));Serial.print(voltage_vbat.currentValue());
-      Serial.print(F(",relay_car_220_loader:"));Serial.print(relay_car_220_loader.currentValue());
-      Serial.print(F(",relay_vbat:"));Serial.print(relay_inverter_net.currentValue());
-      Serial.print(F(",relay_car:"));Serial.print(relay_car.currentValue());
-      Serial.print(F(",relay_inverter:"));Serial.print(relay_inverter_net.currentValue());
+      Serial.print(F(",fanSpeed:"));Serial.print(fan_speed.value());
+      Serial.print(F(",tempSensorOk:"));Serial.print(tempsensor.isOk());
+      Serial.print(F(",temperatur:"));Serial.print(tempsensor.value());
+      Serial.print(F(",voltage_220:"));Serial.print(voltage_220.value());
+      Serial.print(F(",voltage_car:"));Serial.print(voltage_car.value());
+      Serial.print(F(",voltage_vbat:"));Serial.print(voltage_vbat.value());
+      Serial.print(F(",relay_car_220_loader:"));Serial.print(relay_car_220_loader.value());
+      Serial.print(F(",relay_vbat:"));Serial.print(relay_inverter_net.value());
+      Serial.print(F(",relay_car:"));Serial.print(relay_car.value());
+      Serial.print(F(",relay_inverter:"));Serial.print(relay_inverter_net.value());
       Serial.print(F("}\r\n"));
     }
 
@@ -147,18 +194,35 @@ class CarApp {
       runVoltage220() && readVoltageCar() && readVoltageVBat();
     }
 
+    void powerOff() {
+      // Relais Output VBAT off
+      // Relais Output PASSTHRUE off
+      // LadeStrecke auf 220V
+    }
+
     void checkTemperatur() {
-      temperatur = readMCP9808();
-      if (temperatur < 1000) {
+      if (!tempsensor.isOk()) {
+        // fullspeed without sensor
+        fan_speed.write(255);
+        tempsensor.begin();
+        return;
+      }
+      tempsensor.read();
+      if (tempsensor.value() < 30) {
         // pwm off
-      } else if (temperatur < 2000) {
+        fan_speed.write(0);
+      } else if (tempsensor.value() < 35) {
         // pwm 40%
-      } else if (temperatur < 3000) {
+        fan_speed.write(80);
+      } else if (tempsensor.value() < 40) {
         // pwm 80%
-      } else if (temperatur < 3000) {
+        fan_speed.write(160);
+      } else if (tempsensor.value() < 50) {
         // pwm 100%
-      } else if (temperatur > 3200) {
+        fan_speed.write(255);
+      } else if (tempsensor.value() >= 50) {
         // poweroff
+        powerOff();
       }
     }
 
@@ -202,11 +266,12 @@ class CarApp {
 
 CarApp app;
 
+//Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 //Timer t;
 void loop()
 {
   app.loop();
-//  t.update();
+
 }
 
 //int cnt = 0;
@@ -216,10 +281,5 @@ void loop()
 void setup()
 {
   Serial.begin(9600);
-
-//  t.every(1000, jo);
-
-//  delay(2000);
-//  Serial.println("jo-1");
   app.setup();
 }
