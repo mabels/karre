@@ -4,87 +4,12 @@
 #include "Wire.h"
 #include "Adafruit_MCP9808.h"
 
-template <int8_t port>
-class AnalogRead {
-  private:
-    int16_t state;
-  public:
-    void setup() {
-      pinMode(port, INPUT);
-      //digitalWrite(port, HIGH); //pull up on
-      state = 0;
-    }
-    int16_t read() {
-      state = analogRead(port);
-      return state;
-    }
-    int16_t value() const {
-      return state;
-    }
-};
+#include "analogread.h"
+#include "analogwrite.h"
 
-template <int8_t port>
-class AnalogWrite {
-  private:
-    int16_t currentValue;
-  public:
-    void setup() {
-      pinMode(port, OUTPUT);
-      currentValue = 0;
-    }
-    int16_t write(int16_t v) {
-      currentValue = v;
-      analogWrite(port, currentValue);
-      return currentValue;
-    }
-    int16_t value() const {
-      return currentValue;
-    }
-};
+#include "digitalwrite.h"
 
-template <int8_t port>
-class DigitalWrite {
-  private:
-    int8_t state;
-  public:
-    DigitalWrite& setup() {
-      pinMode(port, OUTPUT);
-      return *this;
-    }
-
-    void high() {
-      write(HIGH);
-    }
-    void low() {
-      write(LOW);
-    }
-
-    int8_t write(int8_t _state) {
-      state = _state;
-      digitalWrite(port, state);
-      return state;
-    }
-    int8_t value() const {
-      return state;
-    }
-};
-
-
-class Delegate {
-public:
-    typedef void (*Ptr)(void *);
-
-    template <class T, void (T::*TMethod)(void)>
-    static Ptr instance(T* object_ptr) {
-        return static_cast<Ptr>(&method_stub<T, TMethod>);
-    }
-private:
-    template <class T, void (T::*TMethod)(void)>
-    static void method_stub(void* object_ptr) {
-        T* p = static_cast<T*>(object_ptr);
-        return (p->*TMethod)();
-    }
-};
+#include "delegate.h"
 
 class TempSensor {
   private:
@@ -100,13 +25,16 @@ class TempSensor {
     }
     TempSensor() : ok(false), currentValue(0) { }
     float read() {
+      if (!ok) {
+        ok = tempsensor.begin();
+        if (!ok) {
+          return -4711;
+        }
+      }
       tempsensor.awake();
       currentValue = tempsensor.readTempC();
       tempsensor.shutdown();
       return currentValue;
-    }
-    void begin() {
-      ok = tempsensor.begin();
     }
 };
 
@@ -155,7 +83,6 @@ class CarApp {
       relay_vbat.setup().high();
       relay_car.setup().high();
 
-      tempsensor.begin();
       //Serial.println("jo-3");
       t.every(1000, delegateSendState, this);
       //delay(1000);
@@ -201,13 +128,13 @@ class CarApp {
     }
 
     void checkTemperatur() {
+      tempsensor.read();
       if (!tempsensor.isOk()) {
         // fullspeed without sensor
         fan_speed.write(255);
-        tempsensor.begin();
+        //tempsensor.begin();
         return;
       }
-      tempsensor.read();
       if (tempsensor.value() < 30) {
         // pwm off
         fan_speed.write(0);
@@ -270,7 +197,7 @@ CarApp app;
 //Timer t;
 void loop()
 {
-  app.loop();
+//  app.loop();
 
 }
 
@@ -278,8 +205,69 @@ void loop()
 //void jo() {
 //  Serial.println((int)&app);
 //}
+TempSensor ts;
 void setup()
 {
   Serial.begin(9600);
-  app.setup();
+  for (int8_t i = 0; i < 6 ; ++i) {
+    pinMode(2+i, OUTPUT);
+    digitalWrite(2+i, HIGH);
+  }
+  for (int8_t i = 4; i < 6 ; ++i) {
+    pinMode(2+i, OUTPUT);
+    digitalWrite(2+i, LOW);
+  }
+  Serial.print(A0);
+  pinMode(A0,INPUT);
+    delay(1000);
+  Serial.print(A1);
+  pinMode(A1,INPUT);
+    delay(1000);
+  Serial.print(A2);
+  pinMode(A2,INPUT);
+    delay(1000);
+  Serial.print(A3);
+  pinMode(A3,INPUT);
+    delay(1000);
+  Serial.print(A4);
+  pinMode(A4,INPUT);
+    delay(1000);
+  Serial.print(A5);
+  pinMode(A5,INPUT);
+    delay(1000);
+  Serial.print(A6);
+  pinMode(A6,INPUT);
+    delay(1000);
+  Serial.print(A7);
+  pinMode(A7,INPUT);
+    delay(1000);
+  while (1) {
+    Serial.print(">>>");
+    Serial.println(ts.read());
+    delay(1000);
+  }
+
+  /*
+  digitalWrite(8, HIGH);
+  delay(200);
+  digitalWrite(8, LOW);
+  */
+  /*
+  analogWrite(6, 250);
+  delay(1000);
+  digitalWrite(6, HIGH);
+  delay(1000);
+  digitalWrite(6, LOW);
+  */
+  /*
+  while (1) {
+    for (int8_t i = 3; i <= 3 ; ++i) {
+      delay(2000);
+      digitalWrite(2+i, LOW);
+      delay(1000);
+      digitalWrite(2+i, HIGH);
+    }
+  }
+  */
+//  app.setup();
 }
