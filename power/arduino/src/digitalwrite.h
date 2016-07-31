@@ -17,6 +17,7 @@ class DigitalWrite {
     }
 
     int8_t write(int8_t _state) {
+      Serial.print(F("State:"));Serial.print(port);Serial.println(_state);
       state = _state;
       digitalWrite(port, state);
       return state;
